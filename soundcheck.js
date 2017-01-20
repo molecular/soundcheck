@@ -5,13 +5,12 @@ var config = require('./config');
 var request = require('request');
 var fs = require('fs');
 var _ = require('lodash');
+var stream = require('stream');
 
 cmd
   .version('0.1.0')
-  .option('-t, --torrent <url>', 'Download Torrent')
-  .option('-P, --pineapple', 'Add pineapple')
-  .option('-b, --bbq-sauce', 'Add bbq sauce')
-  .option('-c, --cheese [type]', 'Add the specified type of cheese [marble]', 'marble')
+  .option('-u, --torrent_url <url>', 'Download Torrent')
+  .option('-f, --torrent_file <file>', 'Download Torrent')
   .parse(process.argv);
 
 var download_content = function( premiumize_content ) {
@@ -62,40 +61,62 @@ var premiumize_progress = ( id ) => {
 }
 
 var premiumize_handler = (err, response, body) => {
-	console.log("preimiumize api response received. body: ", body );
-	body = JSON.parse( body );
-	if ( !body.status === 'success' ) {
-
+	if ( err ) {
+		console.log("premiumize_handler err: ", err);
 	} else {
-console.log("body.type", body.type);
-		if ( body.type === 'torrent' ) {
-			premiumize_progress( body.id );
+//console.log("preimiumize api response received: ", response );
+		console.log("preimiumize api response received. body: ", body );
+		body = JSON.parse( body );
+		if ( !body.status === 'success' ) {
+
+		} else {
+	console.log("body.type", body.type);
+			if ( body.type === 'torrent' ) {
+				premiumize_progress( body.id );
+			}
 		}
 	}
 }
 
-var queue_torrent = function( url ) {
-	
-	// request torrent file content
-	request
-		.get( url )
-		.on( 'response', ( response ) => {
-			console.log("torrent file response.body: ", response.body );
-		});
+var queue_torrent_url = function( url ) {
+	var torrent_content_stream = stream.Readable();
 
-	// create transfer at premiumize.me using torrent file content
+	// mofo shit jooou! how to elegantly stream GET -> POST w/o tmp file???
+
+	// request torrent file content
+	request.get( url).pipe( fs.createWriteStream( 'tmp.torrent' ) )
+}
+
+/*	request
+		.get( url, ( error, response, body ) => {
+			torrent_content_stream.push( body );
+		});
+*/
+/*		.on( 'response', ( response ) => {
+			console.log("response.statusCode: ", response.statusCode );
+//console.log("torrent file response: ", response );
+			console.log("\n\n\n-------------\ntorrent file response.body: ", response.body );
+			torrent_content_stream.push( )
+		});
+*/
+
+var queue_torrent_file = function( filename ) {
 	request.post( 'https://www.premiumize.me/api/transfer/create?type=torrent', {
 		formData: {
 			customer_id: config.premiumize.customer_id,
 			pin: config.premiumize.pin,
-			src: fs.createReadStream( './test.torrent' )
+			src: fs.createReadStream( filename )
 		}
 	}, premiumize_handler );
 }
 
-if (cmd.torrent) {
-	console.log( 'torrents:', cmd.torrent );
-	queue_torrent( cmd.torrent );
+if ( cmd.torrent_url ) {
+	console.log( 'torrent urls:', cmd.torrent_url );
+	queue_torrent_url( cmd.torrent_url );
 }
 
 
+if ( cmd.torrent_file ) {
+	console.log( 'torrent files:', cmd.torrent_file );
+	queue_torrent_file( cmd.torrent_file );
+}
