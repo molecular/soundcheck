@@ -9,20 +9,42 @@ var stream = require('stream');
 
 cmd
   .version('0.1.0')
+  .option('-t, --torrent <url|file_url>', 'Download Torrent')
   .option('-u, --torrent_url <url>', 'Download Torrent')
   .option('-f, --torrent_file <file>', 'Download Torrent')
+
   .parse(process.argv);
 
-var download_content = function( premiumize_content ) {
+var premiumize_delete = function( id, callback ) {
+console.log("premiumize_delete(", id, ")");
+	request.post( 'https://www.premiumize.me/api/folder/delete',  {
+		form: {
+			customer_id: config.premiumize.customer_id,
+			pin: config.premiumize.pin,
+			id: id
+		}
+	}, ( err, response, body ) => {
+console.log("delete response.statusCode", response.statusCode);
+//console.log("delete callback(", id, "), response", response);
+		if ( callback ) callback( id );
+	} );
+}
+
+var download_content = function( transfer, premiumize_content, finished_callback ) {
+//console.log("downloading content:", premiumize_content );
 	var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
-	request.get( premiumize_content.zip ).pipe( 
+	request( premiumize_content.zip )
+	.on('response', ( e ) => {
+		finished_callback( transfer.id );
+	}).pipe( 
 		fs.createWriteStream( local_filename )
 	);
 	console.log("download started to", local_filename );
+	// remove file from premiumize cloud
 }
 
 var premiumize_download = function( transfer ) {
-	console.log( "downloading transfer", transfer );
+//	console.log( "downloading transfer", transfer );
 	request.post( 'https://www.premiumize.me/api/torrent/browse', {
 		form: {
 			customer_id: config.premiumize.customer_id,
@@ -32,7 +54,11 @@ var premiumize_download = function( transfer ) {
 	}, ( err, response, body ) => {
 		var body = JSON.parse( body );
 		_.values( body.content ).forEach( ( content ) => {
-			download_content( content );
+			download_content( transfer, content, ( id ) => {
+				premiumize_delete( id, ( id ) => {
+					console.log("id", id, "deleted");					
+				} );
+			} );
 		})
 	} );
 }
@@ -47,16 +73,35 @@ var premiumize_progress = ( id ) => {
 		}
 	}, ( err, response, body ) => {
 		var body = JSON.parse( body );
+		// first filter all transfers by id (we download a single id here)
+		transfers = _.filter( body.transfers, ( transfer ) => {
+			return transfer.id == id;
+		});
 
-		// condense transfer list by transfer.id
-		var finished_by_id = _.reduce( body.transfers, ( map, transfer ) => {
+		// condense transfer list by transfer.id filtering for status=='finished'
+		var finished_by_id = _.reduce( transfers, ( map, transfer ) => {
 			if ( transfer.status == 'finished' ) {
 				map[ transfer.id ] = transfer;
 			}
 			return map;
 		}, {} );
 
-		premiumize_download( finished_by_id[ id ] );
+		// handle finished transfers
+		_.forEach( finished_by_id, ( transfer ) => {
+			premiumize_download( transfer );
+		});
+
+		// condense transfer list by transfer.id filtering for status==''
+		var downloading_by_id = _.reduce( transfers, ( map, transfer ) => {
+			if ( transfer.status !== 'finished' ) {
+				map[ transfer.id ] = transfer;
+			}
+			return map;
+		}, {} );
+
+		if ( _.size( downloading_by_id ) > 0 ) {
+			setTimeout( premiumize_progress, config.poll_interval_msecs, id );
+		}
 	} );
 }
 
@@ -84,21 +129,9 @@ var queue_torrent_url = function( url ) {
 	// mofo shit jooou! how to elegantly stream GET -> POST w/o tmp file???
 
 	// request torrent file content
-	request.get( url).pipe( fs.createWriteStream( 'tmp.torrent' ) )
+	request.get( url ).pipe( fs.createWriteStream( 'tmp.torrent' ) )
+	queue_torrent_file( 'tmp.torrent' );
 }
-
-/*	request
-		.get( url, ( error, response, body ) => {
-			torrent_content_stream.push( body );
-		});
-*/
-/*		.on( 'response', ( response ) => {
-			console.log("response.statusCode: ", response.statusCode );
-//console.log("torrent file response: ", response );
-			console.log("\n\n\n-------------\ntorrent file response.body: ", response.body );
-			torrent_content_stream.push( )
-		});
-*/
 
 var queue_torrent_file = function( filename ) {
 	request.post( 'https://www.premiumize.me/api/transfer/create?type=torrent', {
@@ -108,6 +141,15 @@ var queue_torrent_file = function( filename ) {
 			src: fs.createReadStream( filename )
 		}
 	}, premiumize_handler );
+}
+
+if ( cmd.torrent ) {
+	console.log( 'torrents: ', cmd.torrent );
+	if ( cmd.torrent.startsWith( 'file://' ) ) {
+		queue_torrent_file( cmd.torrent.substring( 6 ) );
+	} else {
+		queue_torrent_url( cmd.torrent );
+	}
 }
 
 if ( cmd.torrent_url ) {
