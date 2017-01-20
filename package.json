@@ -1,0 +1,22 @@
+{
+  "name": "soundcheck",
+  "version": "0.1.0",
+  "description": "we'll see what will come of this...",
+  "main": "soundcheck.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/molecular/soundcheck.git"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/molecular/soundcheck/issues"
+  },
+  "homepage": "https://github.com/molecular/soundcheck#readme",
+  "dependencies": {
+    "commander": "^2.9.0"
+  }
+}
