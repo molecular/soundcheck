@@ -43,7 +43,12 @@ var unzip = function( filename, dirname ) {
 		}
 		// write the file
     	entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
-	  });	
+	  })
+	  .on('end', () => {
+	  	fs.unlink( filename, () => {
+	  		console.log("deleted file", filename);
+	  	})
+	  });
 
 }
 
