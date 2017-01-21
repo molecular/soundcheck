@@ -17,6 +17,7 @@ cmd
 
   .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
 
+  .option('-w, --wait', 'wait for transfers to finish and try to handle them')
   .parse(process.argv);
 
 var unzip = function( filename, dirname ) {
@@ -25,7 +26,7 @@ var unzip = function( filename, dirname ) {
 	fs.createReadStream( filename )
 	.pipe(unzip_extract({ path: zip_destination }));
 
-	console.log( "\nunpacking zip to", zip_destination );
+	console.log( "\nunpacking zip to", zip_destination, '\n---------------------------------\n' );
 	fs.createReadStream( filename )
 	  .pipe(unzip_parse())
 	  .on('entry', function (entry) {
@@ -33,8 +34,15 @@ var unzip = function( filename, dirname ) {
 	    var type = entry.type; // 'Directory' or 'File'
 	    var size = entry.size;
 	    console.log( "writing", fileName );
+	    // create locally deep directory if necessary
+	    var file_path_array = fileName.split('/');
+	    file_path_array.pop();
+	    var dir = zip_destination + '/' + file_path_array.join('/');
+	    if ( !fs.existsSync( dir ) ) {
+		    fs.mkdirSync( dir );
+		}
+		// write the file
     	entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
-//	      entry.autodrain();
 	  });	
 
 }
@@ -64,7 +72,9 @@ var download_content = function( transfer, premiumize_content, finished_callback
 			unzip( local_filename, premiumize_content.name );
 		}).pipe( 
 			fs.createWriteStream( local_filename )
-		);
+		).on( 'data', ( chunk ) => {
+			console.log(chunk.length);
+		});
 		console.log("\ndownload of", premiumize_content.zip + " => ", local_filename );
 	} else {
 		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
@@ -106,12 +116,20 @@ console.log( "progress called on id", id );
 		var transfers = body.transfers;
 
 		_.forEach( transfers, ( transfer ) => {
-			console.log("   ", transfer.status, ' - ', transfer.name, ', progress:', transfer.progress );
+			console.log("   ", transfer.id.substring(0, 8), ':', transfer.status, ' - ', transfer.name ? transfer.name.substring(0, 24) : "", ', ', transfer.message );
 		});
+
+		transfers_by_status = _.reduce( transfers, ( o, t ) => {
+			if ( !o[t.status] ) o[t.status] = [];
+				o[t.status][t.id] = t;
+				return o;
+		}, {});
+
+//console.log("transfers_by_status", transfers_by_status);
 
 		// first filter all transfers by id (we download a single id here)
 		transfers = _.filter( body.transfers, ( transfer ) => {
-			return transfer.id == id;
+			return id === undefined || transfer.id == id;
 		});
 
 		// condense transfer list by transfer.id filtering for status=='finished'
@@ -202,4 +220,8 @@ if ( cmd.torrent_url ) {
 if ( cmd.torrent_file ) {
 	console.log( 'torrent files:', cmd.torrent_file );
 	queue_torrent_file( cmd.torrent_file );
+}
+
+if ( cmd.wait ) {
+	premiumize_progress();
 }
