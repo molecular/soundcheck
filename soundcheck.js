@@ -103,25 +103,15 @@ console.log( "progress called on id", id );
 		}
 	}, ( err, response, body ) => {
 		var body = JSON.parse( body );
+		var transfers = body.transfers;
 
-//console.log("transfers", body.transfers);
+		_.forEach( transfers, ( transfer ) => {
+			console.log("   ", transfer.status, ' - ', transfer.name, ', progress:', transfer.progress );
+		});
 
 		// first filter all transfers by id (we download a single id here)
 		transfers = _.filter( body.transfers, ( transfer ) => {
 			return transfer.id == id;
-		});
-
-		// condense transfer list by transfer.id filtering for status=='waiting'
-		var waiting_by_id = _.reduce( transfers, ( map, transfer ) => {
-			if ( transfer.status == 'waiting' ) {
-				map[ transfer.id ] = transfer;
-			}
-			return map;
-		}, {} );
-
-		// handle finished transfers
-		_.forEach( waiting_by_id, ( transfer ) => {
-			console.log("   ", transfer.status, ' - ', transfer.name, ', progress:', transfer.progress );
 		});
 
 		// condense transfer list by transfer.id filtering for status=='finished'
