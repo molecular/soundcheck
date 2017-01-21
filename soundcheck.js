@@ -25,7 +25,7 @@ var unzip = function( filename, dirname ) {
 	fs.createReadStream( filename )
 	.pipe(unzip_extract({ path: zip_destination }));
 
-	console.log( "unpacking zip to", zip_destination );
+	console.log( "\nunpacking zip to", zip_destination );
 	fs.createReadStream( filename )
 	  .pipe(unzip_parse())
 	  .on('entry', function (entry) {
@@ -55,17 +55,17 @@ console.log("delete response.statusCode", response.statusCode);
 }
 
 var download_content = function( transfer, premiumize_content, finished_callback ) {
-console.log("downloading content:", premiumize_content );
+//console.log("downloading content:", premiumize_content );
 	if ( premiumize_content.zip ) {
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
-		request( premiumize_content.zip, ( error, message, body ) => {
+		request.get( { url: premiumize_content.zip, encoding: null }, ( error, message, body ) => {
 			finished_callback( transfer.id );
 			// unzip
 			unzip( local_filename, premiumize_content.name );
 		}).pipe( 
 			fs.createWriteStream( local_filename )
 		);
-		console.log("download started to", local_filename );
+		console.log("\ndownload of", premiumize_content.zip + " => ", local_filename );
 	} else {
 		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
 		finished_callback( transfer.id );
@@ -73,7 +73,7 @@ console.log("downloading content:", premiumize_content );
 }
 
 var premiumize_download = function( transfer ) {
-//	console.log( "downloading transfer", transfer );
+console.log( "downloading transfer", transfer );
 	request.post( 'https://www.premiumize.me/api/torrent/browse', {
 		form: {
 			customer_id: config.premiumize.customer_id,
@@ -84,6 +84,7 @@ var premiumize_download = function( transfer ) {
 		var body = JSON.parse( body );
 		_.values( body.content ).forEach( ( content ) => {
 			download_content( transfer, content, ( id ) => {
+				console.log( "download finished, deleting premiumize id", id );
 				premiumize_delete( id, ( id ) => {
 					console.log("id", id, "deleted");					
 				} );
@@ -93,7 +94,7 @@ var premiumize_download = function( transfer ) {
 }
 
 var premiumize_progress = ( id ) => {
-	console.log( "progress called on id", id );
+console.log( "progress called on id", id );
 
 	request.post( 'https://www.premiumize.me/api/transfer/list', {
 		form: {
@@ -120,7 +121,7 @@ var premiumize_progress = ( id ) => {
 
 		// handle finished transfers
 		_.forEach( waiting_by_id, ( transfer ) => {
-			console.log("   WAIT ", transfer.name, ', progress:', transfer.progress );
+			console.log("   ", transfer.status, ' - ', transfer.name, ', progress:', transfer.progress );
 		});
 
 		// condense transfer list by transfer.id filtering for status=='finished'
@@ -145,7 +146,6 @@ var premiumize_progress = ( id ) => {
 		}, {} );
 
 		if ( _.size( downloading_by_id ) > 0 ) {
-console.log("poll loop active...")
 			setTimeout( premiumize_progress, config.poll_interval_msecs, id );
 		}
 	} );
