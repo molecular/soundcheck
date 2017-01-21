@@ -5,9 +5,9 @@ var config = {
 	},
 	paths: {
 		download: '/data/m/zip',
-		unzip: '/data/m/flac'
+		unzip: '/data/m/music'
 	},
-	poll_interval_msecs: 3000
+	poll_interval_msecs: 11000
 }
 
 module.exports = config;
