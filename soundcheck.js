@@ -6,6 +6,8 @@ var request = require('request');
 var fs = require('fs');
 var _ = require('lodash');
 var stream = require('stream');
+var unzip_extract = require('unzip').Extract;
+var unzip_parse = require('unzip').Parse;
 
 cmd
   .version('0.1.0')
@@ -13,7 +15,29 @@ cmd
   .option('-u, --torrent_url <url>', 'Download Torrent')
   .option('-f, --torrent_file <file>', 'Download Torrent')
 
+  .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
+
   .parse(process.argv);
+
+var unzip = function( filename, dirname ) {
+	console.log("unzipping", filename);
+	var zip_destination = config.paths.unzip + '/' + dirname;
+	fs.createReadStream( filename )
+	.pipe(unzip_extract({ path: zip_destination }));
+
+	console.log( "unpacking zip to", zip_destination );
+	fs.createReadStream( filename )
+	  .pipe(unzip_parse())
+	  .on('entry', function (entry) {
+	    var fileName = entry.path;
+	    var type = entry.type; // 'Directory' or 'File'
+	    var size = entry.size;
+	    console.log( "writing", fileName );
+    	entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
+//	      entry.autodrain();
+	  });	
+
+}
 
 var premiumize_delete = function( id, callback ) {
 console.log("premiumize_delete(", id, ")");
@@ -33,9 +57,10 @@ console.log("delete response.statusCode", response.statusCode);
 var download_content = function( transfer, premiumize_content, finished_callback ) {
 //console.log("downloading content:", premiumize_content );
 	var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
-	request( premiumize_content.zip )
-	.on('response', ( e ) => {
+	request( premiumize_content.zip, ( error, message, body ) => {
 		finished_callback( transfer.id );
+		// unzip
+		unzip( local_filename, premiumize_content.name );
 	}).pipe( 
 		fs.createWriteStream( local_filename )
 	);
@@ -100,6 +125,7 @@ var premiumize_progress = ( id ) => {
 		}, {} );
 
 		if ( _.size( downloading_by_id ) > 0 ) {
+console.log("poll loop active...")
 			setTimeout( premiumize_progress, config.poll_interval_msecs, id );
 		}
 	} );
@@ -141,6 +167,11 @@ var queue_torrent_file = function( filename ) {
 			src: fs.createReadStream( filename )
 		}
 	}, premiumize_handler );
+}
+
+if ( cmd.unzip ) {
+	console.log("unzipping", cmd.unzip, "to", config.paths.unzip );
+	unzip( cmd.unzip, config.paths.unzip );	
 }
 
 if ( cmd.torrent ) {
