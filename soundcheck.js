@@ -11,9 +11,9 @@ var unzip_parse = require('unzip').Parse;
 
 cmd
   .version('0.1.0')
-  .option('-t, --torrent <url|file_url>', 'Download Torrent')
-  .option('-u, --torrent_url <url>', 'Download Torrent')
-  .option('-f, --torrent_file <file>', 'Download Torrent')
+  .option('-t, --torrent <url|file_url>', 'Download Torrents using either url to torrent file or local torrent file (see --torrent_url and --torrent_file). url is detected to be local file if it starts with "file://"')
+  .option('-u, --torrent_url <url>', 'Download Torrent using torrent file from the net. <url> is the url ot the torrent file.')
+  .option('-f, --torrent_file <file>', 'Download Torrent using torrent file from local filesystem. <file> is the local path to the torrent file.')
 
   .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
 
@@ -55,17 +55,21 @@ console.log("delete response.statusCode", response.statusCode);
 }
 
 var download_content = function( transfer, premiumize_content, finished_callback ) {
-//console.log("downloading content:", premiumize_content );
-	var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
-	request( premiumize_content.zip, ( error, message, body ) => {
+console.log("downloading content:", premiumize_content );
+	if ( premiumize_content.zip ) {
+		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
+		request( premiumize_content.zip, ( error, message, body ) => {
+			finished_callback( transfer.id );
+			// unzip
+			unzip( local_filename, premiumize_content.name );
+		}).pipe( 
+			fs.createWriteStream( local_filename )
+		);
+		console.log("download started to", local_filename );
+	} else {
+		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
 		finished_callback( transfer.id );
-		// unzip
-		unzip( local_filename, premiumize_content.name );
-	}).pipe( 
-		fs.createWriteStream( local_filename )
-	);
-	console.log("download started to", local_filename );
-	// remove file from premiumize cloud
+	}
 }
 
 var premiumize_download = function( transfer ) {
@@ -98,9 +102,25 @@ var premiumize_progress = ( id ) => {
 		}
 	}, ( err, response, body ) => {
 		var body = JSON.parse( body );
+
+//console.log("transfers", body.transfers);
+
 		// first filter all transfers by id (we download a single id here)
 		transfers = _.filter( body.transfers, ( transfer ) => {
 			return transfer.id == id;
+		});
+
+		// condense transfer list by transfer.id filtering for status=='waiting'
+		var waiting_by_id = _.reduce( transfers, ( map, transfer ) => {
+			if ( transfer.status == 'waiting' ) {
+				map[ transfer.id ] = transfer;
+			}
+			return map;
+		}, {} );
+
+		// handle finished transfers
+		_.forEach( waiting_by_id, ( transfer ) => {
+			console.log("   WAIT ", transfer.name, ', progress:', transfer.progress );
 		});
 
 		// condense transfer list by transfer.id filtering for status=='finished'
