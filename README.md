@@ -1,4 +1,5 @@
 # soundcheck
+
 we'll see what will come of this...
 
 
@@ -12,5 +13,6 @@ Copy and adjust the example config file.
 
 ```
 #> cp config_example.js config.js
-#> edit config.jssd
+#> edit config.js
 ```
+
