@@ -15,6 +15,8 @@ cmd
   .option('-u, --torrent_url <url>', 'Download Torrent using torrent file from the net. <url> is the url ot the torrent file.')
   .option('-f, --torrent_file <file>', 'Download Torrent using torrent file from local filesystem. <file> is the local path to the torrent file.')
 
+  .option('-l, --list', 'list premiumize cloud files')
+  .option('-d, --download <id>', 'Download file with given premiumize id')
   .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
 
   .option('-w, --wait', 'wait for transfers to finish and try to handle them')
@@ -44,7 +46,8 @@ var unzip = function( filename, dirname ) {
 		// write the file
     	entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
 	  })
-	  .on('end', () => {
+	  .on('close', () => {
+	  	console.log("deleting file", filename);
 	  	fs.unlink( filename, () => {
 	  		console.log("deleted file", filename);
 	  	})
@@ -62,7 +65,8 @@ console.log("premiumize_delete(", id, ")");
 		}
 	}, ( err, response, body ) => {
 console.log("delete response.statusCode", response.statusCode);
-//console.log("delete callback(", id, "), response", response);
+console.log("delete body", body);
+console.log("delete response.body", response.body);
 		if ( callback ) callback( id );
 	} );
 }
@@ -92,9 +96,10 @@ console.log("content dl finished, error", error, "message", message);
 }
 
 var in_progress = {};
+var should_dl = {};
 var premiumize_download = function( transfer ) {
-	if ( !in_progress[ transfer.id ] ) { 
-console.log( "downloading transfer", transfer );
+	if ( !in_progress[ transfer.id ] && should_dl[ transfer.id ] ) { 
+		console.log( "downloading id", transfer.id, "named", transfer.name );
 		in_progress[ transfer.id ] = transfer;
 		request.post( 'https://www.premiumize.me/api/torrent/browse', {
 			form: {
@@ -118,7 +123,7 @@ console.log( "downloading transfer", transfer );
 
 var premiumize_progress = ( id ) => {
 console.log( "progress called on id", id );
-
+	
 	request.post( 'https://www.premiumize.me/api/transfer/list', {
 		form: {
 			customer_id: config.premiumize.customer_id,
@@ -129,7 +134,7 @@ console.log( "progress called on id", id );
 		var transfers = body.transfers;
 
 		_.forEach( transfers, ( transfer ) => {
-			console.log("   ", transfer.id.substring(0, 8), ':', transfer.status, ' - ', transfer.name ? transfer.name.substring(0, 24) : "", ', ', transfer.message );
+			console.log("   ", transfer.id, ':', transfer.status, ' - ', transfer.name ? transfer.name.substring(0, 40) : "", ', ', transfer.message );
 		});
 
 		transfers_by_status = _.reduce( transfers, ( o, t ) => {
@@ -172,10 +177,10 @@ var premiumize_handler = (err, response, body) => {
 		console.log("preimiumize api response received. body: ", body );
 		body = JSON.parse( body );
 		if ( !body.status === 'success' ) {
-
 		} else {
 	console.log("body.type", body.type);
 			if ( body.type === 'torrent' ) {
+				should_dl[ body.id ] = true;
 				premiumize_progress( body.id );
 			}
 		}
@@ -204,7 +209,7 @@ var queue_torrent_file = function( filename ) {
 
 if ( cmd.unzip ) {
 	console.log("unzipping", cmd.unzip, "to", config.paths.unzip );
-	unzip( cmd.unzip, config.paths.unzip );	
+	unzip( cmd.unzip, cmd.unzip.split('.')[0] );	
 }
 
 if ( cmd.torrent ) {
@@ -227,6 +232,17 @@ if ( cmd.torrent_file ) {
 	queue_torrent_file( cmd.torrent_file );
 }
 
+if ( cmd.download ) {
+	var id = cmd.download;
+	should_dl[ id ] = true;
+	premiumize_progress( id );	
+}
+
+if ( cmd.list ) {
+	premiumize_progress();	
+}
+
 if ( cmd.wait ) {
 	premiumize_progress();
 }
+
