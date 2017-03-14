@@ -18,6 +18,7 @@ cmd
   .option('-l, --list', 'list premiumize cloud files')
   .option('-d, --download <id>', 'Download file with given premiumize id')
   .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
+  .option('-r, --remove <id>', 'remove file with <id> from premiumize cloud' )
 
   .option('-w, --wait', 'wait for transfers to finish and try to handle them')
   .parse(process.argv);
@@ -32,35 +33,36 @@ var unzip = function( filename, dirname ) {
 	fs.createReadStream( filename )
 	  .pipe(unzip_parse())
 	  .on('entry', function (entry) {
-	    var fileName = entry.path;
-	    var type = entry.type; // 'Directory' or 'File'
-	    var size = entry.size;
-	    console.log( "writing", fileName );
-	    // create locally deep directory if necessary
-	    var file_path_array = fileName.split('/');
-	    file_path_array.pop();
-	    var dir = zip_destination + '/' + file_path_array.join('/');
-	    if ( !fs.existsSync( dir ) ) {
-		    fs.mkdirSync( dir );
+		var fileName = entry.path;
+		var type = entry.type; // 'Directory' or 'File'
+		var size = entry.size;
+		console.log( "writing", fileName );
+		// create locally deep directory if necessary
+		var file_path_array = fileName.split('/');
+		file_path_array.pop();
+		var dir = zip_destination + '/' + file_path_array.join('/');
+		if ( !fs.existsSync( dir ) ) {
+			fs.mkdirSync( dir );
 		}
 		// write the file
-    	entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
+		entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
 	  })
 	  .on('close', () => {
-	  	console.log("deleting file", filename);
-	  	fs.unlink( filename, () => {
-	  		console.log("deleted file", filename);
-	  	})
+		console.log("deleting file", filename);
+		fs.unlink( filename, () => {
+			console.log("deleted file", filename);
+		})
 	  });
 
 }
 
 var premiumize_delete = function( id, callback ) {
 console.log("premiumize_delete(", id, ")");
-	request.post( 'https://www.premiumize.me/api/folder/delete',  {
+	request.post( 'https://www.premiumize.me/api/item/delete',  {
 		form: {
 			customer_id: config.premiumize.customer_id,
 			pin: config.premiumize.pin,
+			type: 'torrent',
 			id: id
 		}
 	}, ( err, response, body ) => {
@@ -76,7 +78,7 @@ var download_content = function( transfer, premiumize_content, finished_callback
 	if ( premiumize_content.zip ) {
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
 		request.get( { url: premiumize_content.zip, encoding: null }, ( error, message, body ) => {
-console.log("content dl finished, error", error, "message", message);
+//console.log("content dl finished, error", error, "message", message);
 			// call callback
 			finished_callback( transfer.id );
 			// unzip
@@ -121,8 +123,7 @@ var premiumize_download = function( transfer ) {
 	}
 }
 
-var premiumize_progress = ( id ) => {
-console.log( "progress called on id", id );
+var premiumize_progress = () => {
 	
 	request.post( 'https://www.premiumize.me/api/transfer/list', {
 		form: {
@@ -145,9 +146,9 @@ console.log( "progress called on id", id );
 
 //console.log("transfers_by_status", transfers_by_status['finished']);
 
-		// first filter all transfers by id (we download a single id here)
+		// first filter all transfers by id 
 		transfers = _.filter( body.transfers, ( transfer ) => {
-			return id === undefined || transfer.id == id;
+			return should_dl[transfer.id];
 		});
 
 		// handle finished transfers
@@ -204,12 +205,20 @@ var queue_torrent_file = function( filename ) {
 			pin: config.premiumize.pin,
 			src: fs.createReadStream( filename )
 		}
-	}, premiumize_handler );
+	}, (err, response, body) => {
+		fs.unlink( filename, () => {
+			console.log("deleted file", filename);
+		})
+	});
 }
 
 if ( cmd.unzip ) {
 	console.log("unzipping", cmd.unzip, "to", config.paths.unzip );
-	unzip( cmd.unzip, cmd.unzip.split('.')[0] );	
+	var dest_dir = cmd.unzip.split('/').pop();
+	dest_dir = dest_dir.split('.')[0];
+	console.log("dest_dir", dest_dir);
+	cmd.unzip.split('.')[0]
+	unzip( cmd.unzip, dest_dir );	
 }
 
 if ( cmd.torrent ) {
@@ -232,10 +241,16 @@ if ( cmd.torrent_file ) {
 	queue_torrent_file( cmd.torrent_file );
 }
 
+if ( cmd.remove ) {
+	premiumize_delete( cmd.remove );
+}
+
 if ( cmd.download ) {
-	var id = cmd.download;
-	should_dl[ id ] = true;
-	premiumize_progress( id );	
+	console.log("cmd.download", cmd.download.split(',') );
+	_.forEach( cmd.download.split(','), ( id ) => {
+		should_dl[ id ] = true;
+	});
+	premiumize_progress();	
 }
 
 if ( cmd.list ) {
