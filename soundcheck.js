@@ -9,19 +9,6 @@ var stream = require('stream');
 var unzip_extract = require('unzip').Extract;
 var unzip_parse = require('unzip').Parse;
 
-cmd
-  .version('0.1.0')
-  .option('-t, --torrent <url|file_url>', 'Download Torrents using either url to torrent file or local torrent file (see --torrent_url and --torrent_file). url is detected to be local file if it starts with "file://"')
-  .option('-u, --torrent_url <url>', 'Download Torrent using torrent file from the net. <url> is the url ot the torrent file.')
-  .option('-f, --torrent_file <file>', 'Download Torrent using torrent file from local filesystem. <file> is the local path to the torrent file.')
-
-  .option('-l, --list', 'list premiumize cloud files')
-  .option('-d, --download <id>', 'Download file with given premiumize id')
-  .option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
-  .option('-r, --remove <id>', 'remove file with <id> from premiumize cloud' )
-
-  .option('-w, --wait', 'wait for transfers to finish and try to handle them')
-  .parse(process.argv);
 
 var unzip = function( filename, dirname ) {
 	console.log("unzipping", filename);
@@ -198,7 +185,26 @@ var queue_torrent_url = function( url ) {
 	queue_torrent_file( 'tmp.torrent' );
 }
 
+var add_torrent_files = function( files ) {
+	if ( !_.isArray( files ) ) files = [ files ];
+	console.log( "add_torrent_files(): ", files );
+	_.forEach( files, queue_torrent_file );
+}
+
+var add_torrent_urls = function( urls ) {
+	if ( !_.isArray( urls ) ) urls = [ urls ];
+	console.log( "add_torrent_urls(): ", urls );
+	_.forEach( urls, ( url ) => {
+		if ( url.startsWith( 'file://' ) ) {
+			queue_torrent_file( url.substring( 6 ) );
+		} else {
+			queue_torrent_url( url );
+		}
+	});
+}
+
 var queue_torrent_file = function( filename ) {
+	if ( filename.indexOf('*') ) return;
 	request.post( 'https://www.premiumize.me/api/transfer/create?type=torrent', {
 		formData: {
 			customer_id: config.premiumize.customer_id,
@@ -212,52 +218,85 @@ var queue_torrent_file = function( filename ) {
 	});
 }
 
-if ( cmd.unzip ) {
-	console.log("unzipping", cmd.unzip, "to", config.paths.unzip );
-	var dest_dir = cmd.unzip.split('/').pop();
+var download_by_id = function( ids ) {
+	if ( !_.isArray( ids ) ) ids = [ ids ];
+	console.log( "download_by_id(): ", ids );
+	_.forEach( ids, ( id ) => {
+		should_dl[ id ] = true;
+	});
+	premiumize_progress();
+}
+
+var remove_by_id = function( ids ) {
+	if ( !_.isArray( ids ) ) ids = [ ids ];
+	console.log( "remove_by_id(): ", ids );
+	_.forEach( ids, ( id ) => {
+		premiumize_delete( id, ( x ) => {
+			console.log( "delete response: ", x );
+		} );
+	});
+}
+
+var unzip_file = function( file ) {
+	console.log("unzipping", file, "to", config.paths.unzip );
+	var dest_dir = file.split('/').pop();
 	dest_dir = dest_dir.split('.')[0];
 	console.log("dest_dir", dest_dir);
 	cmd.unzip.split('.')[0]
-	unzip( cmd.unzip, dest_dir );	
+	unzip( file, dest_dir );	
 }
 
-if ( cmd.torrent ) {
-	console.log( 'torrents: ', cmd.torrent );
-	if ( cmd.torrent.startsWith( 'file://' ) ) {
-		queue_torrent_file( cmd.torrent.substring( 6 ) );
-	} else {
-		queue_torrent_url( cmd.torrent );
-	}
+var unzip_files = function( files ) {
+	if ( !_.isArray( files ) ) files = [ files ];
+	console.log( "unzip_files(): ", files );
+	_.forEach( files, unzip_file );
 }
 
-if ( cmd.torrent_url ) {
-	console.log( 'torrent urls:', cmd.torrent_url );
-	queue_torrent_url( cmd.torrent_url );
-}
+// commander 
 
+cmd
+	.version('0.1.0')
 
-if ( cmd.torrent_file ) {
-	console.log( 'torrent files:', cmd.torrent_file );
-	queue_torrent_file( cmd.torrent_file );
-}
+cmd
+	.command( 'add_torrent_files <file...>' )
+	.description( 'add torrent files to remote downloader and delete it' )
+	.alias( 'atf' )
+	.action( add_torrent_files );
 
-if ( cmd.remove ) {
-	premiumize_delete( cmd.remove );
-}
+cmd
+	.command( 'add_torrent_urls <url...>' )
+	.description( 'add torrent urls to remote downloader and delete it' )
+	.alias( 'atu' )
+	.action( add_torrent_urls );
 
-if ( cmd.download ) {
-	console.log("cmd.download", cmd.download.split(',') );
-	_.forEach( cmd.download.split(','), ( id ) => {
-		should_dl[ id ] = true;
-	});
-	premiumize_progress();	
-}
+cmd
+	.command( 'list', 'list downloads' )
+	.description( 'list remote downloader items' )
+	.alias( 'l' )
+	.action( premiumize_progress );
 
-if ( cmd.list ) {
-	premiumize_progress();	
-}
+cmd
+	.command( 'download <id...>' )
+	.description( 'download to local filesystem by id' )
+	.alias( 'dl' )
+	.action( download_by_id );
 
-if ( cmd.wait ) {
-	premiumize_progress();
-}
+cmd
+	.command( 'remove <id...>' )
+	.description( 'remove remote file by id' )
+	.alias( 'rm' )
+	.action( remove_by_id );
+
+cmd
+	.command( 'unzip <file...>' )
+	.description( 'unzip local file(s)' )
+	.alias( 'u' )
+	.action( unzip_files );
+
+cmd
+	.option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
+
+	.option('-w, --wait', 'wait for transfers to finish and try to handle them')
+
+cmd.parse(process.argv);
 
