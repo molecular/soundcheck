@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-var cmd = require('commander');
-var config = require('./config');
-var request = require('request');
-var rp = require('request-promise');
-var fs = require('fs');
-var _ = require('lodash');
-var stream = require('stream');
-var unzip_extract = require('unzip').Extract;
-var unzip_parse = require('unzip').Parse;
+const cmd = require('commander');
+const config = require('./config');
+const request = require('request');
+const rp = require('request-promise');
+const fs = require('fs');
+const path = require('path');
+const _ = require('lodash');
+const stream = require('stream');
+const unzip_extract = require('unzip').Extract;
+const unzip_parse = require('unzip').Parse;
 
 
 var unzip = function( filename, dirname ) {
@@ -25,20 +26,25 @@ var unzip = function( filename, dirname ) {
 		var type = entry.type; // 'Directory' or 'File'
 		var size = entry.size;
 		console.log( "writing", fileName );
+
 		// create locally deep directory if necessary
-		var file_path_array = fileName.split('/');
+		var full_path = zip_destination + '/' + fileName;
+		var file_path_array =  full_path.split('/');
 		file_path_array.pop();
-		var dir = zip_destination + '/' + file_path_array.join('/');
-		if ( !fs.existsSync( dir ) ) {
-			fs.mkdirSync( dir );
-		}
+		file_path_array.forEach( (dir, index, splits ) => {
+			const parent = splits.slice(0, index).join('/');
+			const dirPath = path.resolve(parent, dir);
+			if (!fs.existsSync(dirPath)) {
+				fs.mkdirSync(dirPath);
+			}
+		});
+
 		// write the file
 		entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
 	  })
 	  .on('close', () => {
-		console.log("deleting file", filename);
 		fs.unlink( filename, () => {
-			console.log("deleted file", filename);
+			console.log("deleted zip file", filename);
 		})
 	  });
 
@@ -46,7 +52,7 @@ var unzip = function( filename, dirname ) {
 
 var premiumize_delete = function( id, callback ) {
 console.log("premiumize_delete(", id, ")");
-	request.post( 'https://www.premiumize.me/api/item/delete',  {
+	request.post( 'https://www.premiumize.me/api/transfer/delete',  {
 		form: {
 			customer_id: config.premiumize.customer_id,
 			pin: config.premiumize.pin,
@@ -54,19 +60,16 @@ console.log("premiumize_delete(", id, ")");
 			id: id
 		}
 	}, ( err, response, body ) => {
-console.log("delete response.statusCode", response.statusCode);
-console.log("delete body", body);
-console.log("delete response.body", response.body);
+		console.log("delete response.body", response.body);
 		if ( callback ) callback( id );
 	} );
 }
 
 var download_content = function( transfer, premiumize_content, finished_callback ) {
-//console.log("downloading content:", premiumize_content );
+console.log("downloading content:", premiumize_content );
 	if ( premiumize_content.zip ) {
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
 		request.get( { url: premiumize_content.zip, encoding: null }, ( error, message, body ) => {
-//console.log("content dl finished, error", error, "message", message);
 			// call callback
 			finished_callback( transfer.id );
 			// unzip
@@ -75,10 +78,10 @@ var download_content = function( transfer, premiumize_content, finished_callback
 /*		.on( 'data', ( chunk ) => {
 			console.log(chunk.length);
 		})*/
-		.pipe( 
+		.pipe(
 			fs.createWriteStream( local_filename )
 		);
-		console.log("\ndownload of", premiumize_content.zip + " => ", local_filename );
+		console.log("\ndownload of \n    ", premiumize_content.zip + " \n => ", local_filename );
 	} else {
 		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
 		finished_callback( transfer.id );
@@ -122,6 +125,7 @@ var premiumize_progress = () => {
 		var body = JSON.parse( body );
 		var transfers = body.transfers;
 
+		console.log("\n\nall transfers:");
 		_.forEach( transfers, ( transfer ) => {
 			console.log("   ", transfer.id, ':', transfer.status, ' - ', transfer.name ? transfer.name.substring(0, 40) : "", ', ', transfer.message );
 		});
@@ -153,7 +157,7 @@ var premiumize_progress = () => {
 		}, {} );
 
 		if ( _.size( downloading_by_id ) > 0 ) {
-			setTimeout( premiumize_progress, config.poll_interval_msecs, id );
+			setTimeout( premiumize_progress, config.poll_interval_msecs );
 		}
 	} );
 }
@@ -190,6 +194,7 @@ var add_torrent_files = function( files ) {
 	if ( !_.isArray( files ) ) files = [ files ];
 	console.log( "add_torrent_files(): ", files );
 	_.forEach( files, queue_torrent_file );
+	if ( cmd.wait ) premiumize_progress();
 }
 
 var add_torrent_urls = function( urls ) {
@@ -202,10 +207,11 @@ var add_torrent_urls = function( urls ) {
 			queue_torrent_url( url );
 		}
 	});
+	if ( cmd.wait ) premiumize_progress();
 }
 
 var queue_torrent_file = function( filename ) {
-	if ( filename.indexOf('*') ) return;
+	if ( filename.indexOf('*') >= 0 ) return;
 	request.post( 'https://www.premiumize.me/api/transfer/create?type=torrent', {
 		formData: {
 			customer_id: config.premiumize.customer_id,
@@ -213,10 +219,13 @@ var queue_torrent_file = function( filename ) {
 			src: fs.createReadStream( filename )
 		}
 	}, (err, response, body) => {
+console.log("new transfer response:", body);
 		fs.unlink( filename, () => {
 			console.log("deleted file", filename);
 		})
+		download_by_id( body.id );
 	});
+	if ( cmd.wait ) premiumize_progress();
 }
 
 var download_by_id = function( ids ) {
@@ -225,7 +234,7 @@ var download_by_id = function( ids ) {
 	_.forEach( ids, ( id ) => {
 		should_dl[ id ] = true;
 	});
-	premiumize_progress();
+	if ( cmd.wait ) premiumize_progress();
 }
 
 var remove_by_id = function( ids ) {
@@ -293,9 +302,13 @@ cmd
 	.alias( 'u' )
 	.action( unzip_files );
 
+/*cmd
+	.command( 'wait' )
+	.description( 'test' )
+	.alias( 'w' )
+	.action( premiumize_progress );
+*/
 cmd
-	.option('-x, --unzip <zipfile>', 'unzip zipfile to config.paths.unzip' )
-
 	.option('-w, --wait', 'wait for transfers to finish and try to handle them')
 
 cmd.parse(process.argv);
