@@ -3,6 +3,7 @@
 var cmd = require('commander');
 var config = require('./config');
 var request = require('request');
+var rp = require('request-promise');
 var fs = require('fs');
 var _ = require('lodash');
 var stream = require('stream');
@@ -242,7 +243,6 @@ var unzip_file = function( file ) {
 	var dest_dir = file.split('/').pop();
 	dest_dir = dest_dir.split('.')[0];
 	console.log("dest_dir", dest_dir);
-	cmd.unzip.split('.')[0]
 	unzip( file, dest_dir );	
 }
 
