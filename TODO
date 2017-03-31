@@ -2,4 +2,4 @@ TODO
 
  * maybe migrate to request-promise?
  * "dir does not exist" => "mkdir error: dir already exists", wtf
- * downloading needs RAM, so large file dls are prohibitive
+ 
