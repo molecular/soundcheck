@@ -20,7 +20,6 @@
     "commander": "^2.9.0",
     "lodash": "^4.17.4",
     "request": "^2.79.0",
-    "request-promise": "^4.2.0",
     "unzip": "^0.1.11"
   }
 }

@@ -3,7 +3,6 @@
 const cmd = require('commander');
 const config = require('./config');
 const request = require('request');
-const rp = require('request-promise');
 const fs = require('fs');
 const path = require('path');
 const _ = require('lodash');
@@ -66,8 +65,10 @@ console.log("premiumize_delete(", id, ")");
 }
 
 var download_content = function( transfer, premiumize_content, finished_callback ) {
-console.log("downloading content:", premiumize_content );
+	//console.log("downloading content:", premiumize_content );
 	if ( premiumize_content.zip ) {
+		var downloaded_bytes = 0;
+		var chunk_coutner = 0;
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
 		request.get( { url: premiumize_content.zip, encoding: null }, ( error, message, body ) => {
 			// call callback
@@ -75,9 +76,15 @@ console.log("downloading content:", premiumize_content );
 			// unzip
 			unzip( local_filename, premiumize_content.name );
 		})
-/*		.on( 'data', ( chunk ) => {
-			console.log(chunk.length);
-		})*/
+		.on( 'data', ( chunk ) => {
+			//console.log(chunk.length);
+			downloaded_bytes += chunk.length;
+			chunk_counter += 1;
+			if ( chunk_counter % 33 == 0 ) {
+				process.stdout.write( "downloaded ", downloaded_bytes/(1024*1025), " of ", premiumize_content.size/(1024*1024), ' MiB (', (downloaded_bytes * 100 / premiumize_content.size), '%) \r' );
+			}
+			process.stdout.write('\n');
+		})
 		.pipe(
 			fs.createWriteStream( local_filename )
 		);
@@ -228,11 +235,18 @@ var queue_torrent_file = function( filename ) {
 			src: fs.createReadStream( filename )
 		}
 	}, (err, response, body) => {
-console.log("new transfer response:", body);
-		fs.unlink( filename, () => {
-			console.log("deleted file", filename);
-		})
-		download_by_id( body.id );
+//console.log("err:", err);
+		body = JSON.parse( body );
+		if ( body.status == 'success' && body.id !== undefined ) {
+			fs.unlink( filename, () => {
+				console.log("deleted file", filename);
+			})
+			download_by_id( body.id );
+		} else {
+			console.log("transfer problem");
+			console.log("transfer response:", body);
+			console.log("transfer err:", err);
+		}
 	});
 	if ( cmd.wait ) premiumize_progress();
 }

@@ -16,3 +16,8 @@ Copy and adjust the example config file.
 #> edit config.js
 ```
 
+Look at usage help:
+
+```
+#> ./soundcheck -h
+```
