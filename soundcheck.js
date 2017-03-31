@@ -68,9 +68,10 @@ var download_content = function( transfer, premiumize_content, finished_callback
 	//console.log("downloading content:", premiumize_content );
 	if ( premiumize_content.zip ) {
 		var downloaded_bytes = 0;
-		var chunk_coutner = 0;
+		var chunk_counter = 0;
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
 		request.get( { url: premiumize_content.zip, encoding: null }, ( error, message, body ) => {
+			process.stdout.write('\n');
 			// call callback
 			finished_callback( transfer.id );
 			// unzip
@@ -80,10 +81,9 @@ var download_content = function( transfer, premiumize_content, finished_callback
 			//console.log(chunk.length);
 			downloaded_bytes += chunk.length;
 			chunk_counter += 1;
-			if ( chunk_counter % 33 == 0 ) {
-				process.stdout.write( "downloaded ", downloaded_bytes/(1024*1025), " of ", premiumize_content.size/(1024*1024), ' MiB (', (downloaded_bytes * 100 / premiumize_content.size), '%) \r' );
+			if ( (chunk_counter % 33) == 0 ) {
+				process.stdout.write( "\rdownloaded " + Math.round(downloaded_bytes/(1024*1024)) + ' of ' + Math.round(premiumize_content.size/(1024*1024)) + ' MiB (' + Math.round(downloaded_bytes * 100 / premiumize_content.size, 1) + '%)' );
 			}
-			process.stdout.write('\n');
 		})
 		.pipe(
 			fs.createWriteStream( local_filename )
