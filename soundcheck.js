@@ -70,27 +70,35 @@ var download_content = function( transfer, premiumize_content, finished_callback
 		var downloaded_bytes = 0;
 		var chunk_counter = 0;
 		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
+
+		console.log("\n <= ", premiumize_content.zip + " \n => ", local_filename );
+
 		request.get( { url: premiumize_content.zip, encoding: null })
+		
+		// progress meter
 		.on( 'data', ( chunk ) => {
 			//console.log(chunk.length);
 			downloaded_bytes += chunk.length;
 			chunk_counter += 1;
-			if ( (chunk_counter % 33) == 0 ) {
+			if ( (chunk_counter % 330) == 0 ) {
 				process.stdout.write( "\rdownloaded " + Math.round(downloaded_bytes/(1024*1024)) + ' of ' + Math.round(premiumize_content.size/(1024*1024)) + ' MiB (' + Math.round(downloaded_bytes * 100 / premiumize_content.size, 1) + '%)' );
 			}
 		})
-		.on( 'response', ( response ) => {
+		
+		// download finished
+		.on( 'end', () => {
 			// progress meter newline
 			process.stdout.write('\n');
-			// call callback
-			finished_callback( transfer.id );
 			// unzip
 			unzip( local_filename, premiumize_content.name );
-		})
+			// call callback
+			finished_callback( transfer.id );
+		})		
+
+		// pipe content to local zip file
 		.pipe(
 			fs.createWriteStream( local_filename )
 		);
-		console.log("\ndownload of \n    ", premiumize_content.zip + " \n => ", local_filename );
 	} else {
 		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
 		finished_callback( transfer.id );
@@ -259,7 +267,7 @@ var download_by_id = function( ids ) {
 	_.forEach( ids, ( id ) => {
 		should_dl[ id ] = true;
 	});
-	if ( cmd.wait ) premiumize_progress();
+	premiumize_progress();
 }
 
 var remove_by_id = function( ids ) {
