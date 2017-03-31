@@ -114,6 +114,19 @@ var premiumize_download = function( transfer ) {
 	}
 }
 
+var print_transfers = function( description, transfers ) {
+	console.log( "\n--- " + description + " ---\n" );
+	_.forEach( transfers, ( transfer ) => {
+		console.log(
+			(should_dl[transfer.id] ? "  * " : "   "),
+			transfer.id, ':', 
+			transfer.status, ' - ', 
+			transfer.name ? transfer.name.substring(0, 40) : "",
+			', ', transfer.message 
+		);
+	});
+}
+
 var premiumize_progress = () => {
 	
 	request.post( 'https://www.premiumize.me/api/transfer/list', {
@@ -125,10 +138,8 @@ var premiumize_progress = () => {
 		var body = JSON.parse( body );
 		var transfers = body.transfers;
 
-		console.log("\n\nall transfers:");
-		_.forEach( transfers, ( transfer ) => {
-			console.log("   ", transfer.id, ':', transfer.status, ' - ', transfer.name ? transfer.name.substring(0, 40) : "", ', ', transfer.message );
-		});
+		print_transfers( "finished transfers", _.filter( transfers, (t) => { return t.status == 'finished'; } ) );
+		print_transfers( "unfinished transfers ( * : will dl )", _.filter( transfers, (t) => { return t.status != 'finished'; } ) );
 
 		transfers_by_status = _.reduce( transfers, ( o, t ) => {
 			if ( !o[t.status] ) o[t.status] = [];
@@ -136,9 +147,7 @@ var premiumize_progress = () => {
 				return o;
 		}, {});
 
-//console.log("transfers_by_status", transfers_by_status['finished']);
-
-		// first filter all transfers by id 
+		// first filter all transfers by should_dl
 		transfers = _.filter( body.transfers, ( transfer ) => {
 			return should_dl[transfer.id];
 		});
@@ -302,12 +311,6 @@ cmd
 	.alias( 'u' )
 	.action( unzip_files );
 
-/*cmd
-	.command( 'wait' )
-	.description( 'test' )
-	.alias( 'w' )
-	.action( premiumize_progress );
-*/
 cmd
 	.option('-w, --wait', 'wait for transfers to finish and try to handle them')
 
