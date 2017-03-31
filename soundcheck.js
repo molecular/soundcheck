@@ -10,6 +10,27 @@ var stream = require('stream');
 var unzip_extract = require('unzip').Extract;
 var unzip_parse = require('unzip').Parse;
 
+// general premiumize request promise
+
+var premiumize_rp = function( api_path, options ) {
+	options.uri = 'https://www.premiumize.me/api/' + api_path;
+
+	// extend form with auth data and use post if options.form is present
+	if ( options.form !== undefined ) {
+		options.method = 'POST';
+		options.form = _.extend( options.form, {
+			customer_id: config.premiumize.customer_id,
+			pin: config.premiumize.pin
+		});
+	}
+
+	// dispatch request returning promise
+	var p = rp( options );
+	p.catch( (err) => {
+		console.log( "ERROR in premiumize request: ", err );
+	});
+	return p;
+}
 
 var unzip = function( filename, dirname ) {
 	console.log("unzipping", filename);
@@ -176,6 +197,8 @@ var premiumize_handler = (err, response, body) => {
 	}
 }
 
+// action functions (for commander action)
+
 var queue_torrent_url = function( url ) {
 	var torrent_content_stream = stream.Readable();
 
@@ -205,7 +228,8 @@ var add_torrent_urls = function( urls ) {
 }
 
 var queue_torrent_file = function( filename ) {
-	if ( filename.indexOf('*') ) return;
+//	if ( filename.indexOf('*') ) return;
+console.log("queue_torrent_file: ", filename );
 	request.post( 'https://www.premiumize.me/api/transfer/create?type=torrent', {
 		formData: {
 			customer_id: config.premiumize.customer_id,
@@ -232,9 +256,17 @@ var remove_by_id = function( ids ) {
 	if ( !_.isArray( ids ) ) ids = [ ids ];
 	console.log( "remove_by_id(): ", ids );
 	_.forEach( ids, ( id ) => {
-		premiumize_delete( id, ( x ) => {
+/*		premiumize_delete( id, ( x ) => {
 			console.log( "delete response: ", x );
-		} );
+		} );*/
+		premiumize_rp( 'transfer/delete', {
+			form: {
+				type: 'torrent',
+				id: id
+			}
+		}).then( ( rc ) => {
+			console.log("delete promise returned: ", rc );
+		});
 	});
 }
 
