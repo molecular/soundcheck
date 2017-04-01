@@ -34,7 +34,11 @@ var unzip = function( filename, dirname ) {
 			const parent = splits.slice(0, index).join('/');
 			const dirPath = path.resolve(parent, dir);
 			if (!fs.existsSync(dirPath)) {
-				fs.mkdirSync(dirPath);
+				try {
+					fs.mkdirSync(dirPath);
+				} catch( err ) {
+					console.log( "mkdir error: ", err );
+				}
 			}
 		});
 
@@ -270,6 +274,26 @@ var download_by_id = function( ids ) {
 	premiumize_progress();
 }
 
+var leech = function( count ) {
+	request.post( 'https://www.premiumize.me/api/transfer/list', {
+		form: {
+			customer_id: config.premiumize.customer_id,
+			pin: config.premiumize.pin
+		}
+	}, ( err, response, body ) => {
+		var body = JSON.parse( body );
+		var transfers = body.transfers;
+
+		transfers = _.filter( body.transfers, ( transfer ) => {
+			return transfer.status == 'finished';
+		});
+
+		_.forEach( transfers.splice(0, count), ( transfer ) => {
+			download_by_id( transfer.id );
+		});
+	});
+}
+
 var remove_by_id = function( ids ) {
 	if ( !_.isArray( ids ) ) ids = [ ids ];
 	console.log( "remove_by_id(): ", ids );
@@ -322,6 +346,13 @@ cmd
 	.description( 'download to local filesystem by id' )
 	.alias( 'dl' )
 	.action( download_by_id );
+
+cmd
+	.command( 'leech <count>' )
+	.description( 'download to local filesystem any finished transfers' )
+	.alias( 'leech' )
+	.action( leech );
+
 
 cmd
 	.command( 'remove <id...>' )
