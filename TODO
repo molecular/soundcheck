@@ -3,3 +3,4 @@ TODO
  * maybe migrate to request-promise?
  * "dir does not exist" => "mkdir error: dir already exists", wtf
  * serialize downloads (now they happen in parallel, which is undesirable, no only because of the progress meter screwup)
+ * when -w ats <many.torrents>: list loop runs multiple times
