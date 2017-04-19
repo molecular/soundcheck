@@ -326,25 +326,25 @@ cmd
 cmd
 	.command( 'add_torrent_files <file...>' )
 	.description( 'add torrent files to remote downloader and delete it' )
-	.alias( 'atf' )
+	.alias( 'atf' ).alias('add_torrent_files')
 	.action( add_torrent_files );
 
 cmd
 	.command( 'add_torrent_urls <url...>' )
 	.description( 'add torrent urls to remote downloader and delete it' )
-	.alias( 'atu' )
+	.alias( 'atu' ).alias('add_torrent_urls')
 	.action( add_torrent_urls );
 
 cmd
 	.command( 'list', 'list downloads' )
 	.description( 'list remote downloader items' )
-	.alias( 'l' )
+	.alias( 'l' ).alias('ls').alias('list')
 	.action( premiumize_progress );
 
 cmd
 	.command( 'download <id...>' )
 	.description( 'download to local filesystem by id' )
-	.alias( 'dl' )
+	.alias( 'dl' ).alias('download')
 	.action( download_by_id );
 
 cmd
@@ -357,13 +357,13 @@ cmd
 cmd
 	.command( 'remove <id...>' )
 	.description( 'remove remote file by id' )
-	.alias( 'rm' )
+	.alias( 'rm' ).alias('remove')
 	.action( remove_by_id );
 
 cmd
 	.command( 'unzip <file...>' )
 	.description( 'unzip local file(s)' )
-	.alias( 'u' )
+	.alias( 'u' ).alias('unzip')
 	.action( unzip_files );
 
 cmd
