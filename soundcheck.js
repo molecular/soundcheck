@@ -326,44 +326,43 @@ cmd
 cmd
 	.command( 'add_torrent_files <file...>' )
 	.description( 'add torrent files to remote downloader and delete it' )
-	.alias( 'atf' ).alias('add_torrent_files')
+	.alias( 'atf' )
 	.action( add_torrent_files );
 
 cmd
 	.command( 'add_torrent_urls <url...>' )
 	.description( 'add torrent urls to remote downloader and delete it' )
-	.alias( 'atu' ).alias('add_torrent_urls')
+	.alias( 'atu' )
 	.action( add_torrent_urls );
 
 cmd
-	.command( 'list', 'list downloads' )
+	.command( 'list' )
 	.description( 'list remote downloader items' )
-	.alias( 'l' ).alias('ls').alias('list')
+	.alias( 'ls' )
 	.action( premiumize_progress );
 
 cmd
 	.command( 'download <id...>' )
 	.description( 'download to local filesystem by id' )
-	.alias( 'dl' ).alias('download')
+	.alias( 'dl' )
 	.action( download_by_id );
 
 cmd
 	.command( 'leech <count>' )
 	.description( 'download to local filesystem any finished transfers' )
-	.alias( 'leech' )
 	.action( leech );
 
 
 cmd
 	.command( 'remove <id...>' )
 	.description( 'remove remote file by id' )
-	.alias( 'rm' ).alias('remove')
+	.alias( 'rm' )
 	.action( remove_by_id );
 
 cmd
 	.command( 'unzip <file...>' )
 	.description( 'unzip local file(s)' )
-	.alias( 'u' ).alias('unzip')
+	.alias( 'x' )
 	.action( unzip_files );
 
 cmd
