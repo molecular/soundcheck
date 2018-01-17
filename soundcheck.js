@@ -68,54 +68,73 @@ console.log("premiumize_delete(", id, ")");
 	} );
 }
 
-var download_content = function( transfer, premiumize_content, finished_callback ) {
-	//console.log("downloading content:", premiumize_content );
-	if ( premiumize_content.zip ) {
-		var downloaded_bytes = 0;
-		var chunk_counter = 0;
-		var local_filename = config.paths.download + '/' + premiumize_content.name + '.zip';
+var download_content = function( transfer, zip_uri, finished_callback ) {
+	console.log("downloading zip of transfer:", transfer.name );
+	var downloaded_bytes = 0;
+	var chunk_counter = 0;
+	var local_filename = config.paths.download + '/' + transfer.name + '.zip';
 
-		console.log("\n <= ", premiumize_content.zip + " \n => ", local_filename );
+	console.log("\n <= ", zip_uri + " \n => ", local_filename );
 
-		request.get( { url: premiumize_content.zip, encoding: null })
-		
-		// progress meter
-		.on( 'data', ( chunk ) => {
-			//console.log(chunk.length);
-			downloaded_bytes += chunk.length;
-			chunk_counter += 1;
-			if ( (chunk_counter % 330) == 0 ) {
-				process.stdout.write( "\rdownloaded " + Math.round(downloaded_bytes/(1024*1024)) + ' of ' + Math.round(premiumize_content.size/(1024*1024)) + ' MiB (' + Math.round(downloaded_bytes * 100 / premiumize_content.size, 1) + '%)' );
-			}
-		})
-		
-		// download finished
-		.on( 'end', () => {
-			// progress meter newline
-			process.stdout.write('\n');
-			// unzip
-			unzip( local_filename, premiumize_content.name );
-			// call callback
-			finished_callback( transfer.id );
-		})		
-
-		// pipe content to local zip file
-		.pipe(
-			fs.createWriteStream( local_filename )
-		);
-	} else {
-		console.log("the following premiumize_content is not a zip:", premiumize_content, 'not unpacking.' );
+	request.get( { url: zip_uri, encoding: null })
+	
+	// progress meter
+	.on( 'data', ( chunk ) => {
+		//console.log(chunk.length);
+		downloaded_bytes += chunk.length;
+		chunk_counter += 1;
+		if ( (chunk_counter % 330) == 0 ) {
+			process.stdout.write( "\rdownloaded " + Math.round(downloaded_bytes/(1024*1024)) + ' MiB' );
+		}
+	})
+	
+	// download finished
+	.on( 'end', () => {
+		// progress meter newline
+		process.stdout.write('\n');
+		// unzip
+		unzip( local_filename, transfer.name );
+		// call callback
 		finished_callback( transfer.id );
-	}
+	})		
+
+	// pipe content to local zip file
+	.pipe(
+		fs.createWriteStream( local_filename )
+	);
 }
 
 var in_progress = {};
 var should_dl = {};
 var premiumize_download = function( transfer ) {
 	if ( !in_progress[ transfer.id ] && should_dl[ transfer.id ] ) { 
-		console.log( "downloading id", transfer.id, "named", transfer.name );
+		console.log( "downloading (generating zip first) id", transfer.id, "named", transfer.name );
+		// console.log( "transfer: ", transfer);
 		in_progress[ transfer.id ] = transfer;
-		request.post( 'https://www.premiumize.me/api/torrent/browse', {
+		
+		request.post( 'https://www.premiumize.me/api/zip/generate', {
+			form: {
+				customer_id: config.premiumize.customer_id,
+				pin: config.premiumize.pin,
+				items: [{
+					name: transfer.name,
+					id: transfer.folder_id,
+					type: 'folder'
+				}]
+			}
+		}, ( err, response, body ) => {
+			var body = JSON.parse( body );
+			//console.log("zip/create response body", body);
+			download_content( transfer, body.location, ( id ) => {
+				console.log( "download finished, deleting premiumize id", id );
+				premiumize_delete( id, ( id ) => {
+					console.log("id", id, "deleted");					
+				} );
+			} );
+		} );
+
+/*	old api, not supported any more it seems (no transfer.hash)		
+	request.post( 'https://www.premiumize.me/api/torrent/browse', {
 			form: {
 				customer_id: config.premiumize.customer_id,
 				pin: config.premiumize.pin,
@@ -123,6 +142,7 @@ var premiumize_download = function( transfer ) {
 			}
 		}, ( err, response, body ) => {
 			var body = JSON.parse( body );
+			console.log("body", body);
 			_.values( body.content ).forEach( ( content ) => {
 				download_content( transfer, content, ( id ) => {
 					console.log( "download finished, deleting premiumize id", id );
@@ -131,7 +151,7 @@ var premiumize_download = function( transfer ) {
 					} );
 				} );
 			})
-		} );
+		} );*/
 	}
 }
 
