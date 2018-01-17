@@ -11,9 +11,9 @@ const unzip_extract = require('unzip').Extract;
 const unzip_parse = require('unzip').Parse;
 
 
-var unzip = function( filename, dirname ) {
+var unzip = function( filename ) {
 	console.log("unzipping", filename);
-	var zip_destination = config.paths.unzip + '/' + dirname;
+	var zip_destination = config.paths.unzip;
 	fs.createReadStream( filename )
 	.pipe(unzip_extract({ path: zip_destination }));
 
@@ -93,7 +93,7 @@ var download_content = function( transfer, zip_uri, finished_callback ) {
 		// progress meter newline
 		process.stdout.write('\n');
 		// unzip
-		unzip( local_filename, transfer.name );
+		unzip( local_filename );
 		// call callback
 		finished_callback( transfer.id );
 	})		
@@ -275,7 +275,7 @@ var queue_torrent_file = function( filename ) {
 			fs.unlink( filename, () => {
 				console.log("deleted file", filename);
 			})
-			download_by_id( body.id );
+			//download_by_id( body.id );
 		} else {
 			console.log("transfer problem");
 			console.log("transfer response:", body);
@@ -326,10 +326,7 @@ var remove_by_id = function( ids ) {
 
 var unzip_file = function( file ) {
 	console.log("unzipping", file, "to", config.paths.unzip );
-	var dest_dir = file.split('/').pop();
-	dest_dir = dest_dir.split('.')[0];
-	console.log("dest_dir", dest_dir);
-	unzip( file, dest_dir );	
+	unzip( file );	
 }
 
 var unzip_files = function( files ) {
