@@ -46,9 +46,9 @@ var unzip = function( filename ) {
 		entry.pipe(fs.createWriteStream( zip_destination + '/' + fileName ));
 	  })
 	  .on('close', () => {
-		fs.unlink( filename, () => {
-			console.log("deleted zip file", filename);
-		})
+			fs.unlink( filename, (result) => {
+				console.log("deleted zip file", filename, "result", result);
+			})
 	  });
 
 }
@@ -193,8 +193,13 @@ var premiumize_progress = () => {
 			return should_dl[transfer.id];
 		});
 
-		// handle finished transfers
+		// handle finished
 		_.forEach( _.values( transfers_by_status['finished'] ), ( transfer ) => {
+			premiumize_download( transfer );
+		});
+
+		// handle seeding
+		_.forEach( _.values( transfers_by_status['seeding'] ), ( transfer ) => {
 			premiumize_download( transfer );
 		});
 
