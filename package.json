@@ -17,8 +17,8 @@
   },
   "homepage": "https://github.com/molecular/soundcheck#readme",
   "dependencies": {
-    "commander": "^2.9.0",
-    "lodash": "^4.17.4",
+    "commander": "^4.0.1",
+    "lodash": "^4.17.15",
     "request": "^2.79.0",
     "unzip": "^0.1.11"
   }

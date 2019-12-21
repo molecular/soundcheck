@@ -371,7 +371,7 @@ cmd
 
 cmd
 	.command( 'leech <count>' )
-	.description( 'download to local filesystem any finished transfers' )
+	.description( 'download to local filesystem the first <count> finished transfers' )
 	.action( leech );
 
 
